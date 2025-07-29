@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #e5ddd5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #chat-box {
+            height: 80vh;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .chat-message {
+            max-width: 75%;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 15px;
+            word-wrap: break-word;
+        }
+        .mine {
+            background-color: #dcf8c6;
+            align-self: end;
+            text-align: right;
+        }
+        .theirs {
+            background-color: #fff;
+            align-self: start;
+            text-align: left;
+        }
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+        }
+        .msg-meta {
+            font-size: 0.8em;
+            color: #777;
+        }
+        form {
+            background-color: #f1f1f1;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container py-3">
+    <h4 class="text-center mb-3">💬 Office Chat</h4>
+    <div id="chat-box" class="bg-white rounded shadow-sm p-3 d-flex flex-column chat-container border"></div>
+</div>
+
+<form class="container-fluid border-top py-3 bg-white" method="POST" action="/send_message"
+      onsubmit="document.getElementById('name').value = localStorage.getItem('chat_name');">
+    <div class="row gx-2">
+        <input type="hidden" name="name" id="name">
+        <div class="col-9 col-sm-10">
+            <input type="text" name="message" class="form-control" placeholder="Type a message..." required autocomplete="off">
+        </div>
+        <div class="col-3 col-sm-2">
+            <button class="btn btn-success w-100">Send</button>
+        </div>
+    </div>
+</form>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Optional notification sound -->
+<!-- <audio id="notifSound" src="https://notificationsounds.com/storage/sounds/file-sounds-1156-pristine.mp3" preload="auto"></audio> -->
+
+<script>
+    if (!localStorage.getItem("chat_name")) {
+        const name = prompt("Enter your name:");
+        localStorage.setItem("chat_name", name || "Unknown");
+    }
+
+    const yourName = localStorage.getItem("chat_name");
+    let lastMessageCount = 0;
+
+    // Request notification permission
+    if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+
+    function showNotification(msg) {
+        if (Notification.permission === "granted") {
+            new Notification(`💬 ${msg.name}`, {
+                body: msg.text,
+                icon: "https://cdn-icons-png.flaticon.com/512/1384/1384031.png"
+            });
+
+            // Play sound (optional)
+            // document.getElementById("notifSound").play();
+        }
+    }
+
+    function loadMessages() {
+        fetch('/get_messages')
+            .then(res => res.json())
+            .then(data => {
+                const chatBox = document.getElementById("chat-box");
+                chatBox.innerHTML = "";
+                data.forEach(msg => {
+                    const wrapper = document.createElement("div");
+                    wrapper.className = "chat-message " + (msg.name === yourName ? "mine align-self-end" : "theirs align-self-start");
+                    wrapper.innerHTML = `
+                        <div><strong>${msg.name}</strong></div>
+                        <div>${msg.text}</div>
+                        <div class="msg-meta">${msg.time}</div>
+                    `;
+                    chatBox.appendChild(wrapper);
+                });
+
+                // Scroll to latest
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+                // 🔔 Notify if new messages from others
+                if (data.length > lastMessageCount) {
+                    const newMsgs = data.slice(lastMessageCount);
+                    newMsgs.forEach(msg => {
+                        if (msg.name !== yourName) {
+                            showNotification(msg);
+                        }
+                    });
+                }
+
+                lastMessageCount = data.length;
+            });
+    }
+
+    setInterval(loadMessages, 1000);
+    loadMessages();
+</script>
+
+</body>
+</html>
